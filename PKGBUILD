@@ -9,8 +9,8 @@ depends=('libx11' 'libxext' 'libxfixes')
 
 source=("kiosk-wm-run.sh"
     "kiosk-wm.c"
-"makefile")
-
+    "makefile"
+)
 
 sha256sums=('SKIP'
     'SKIP'
