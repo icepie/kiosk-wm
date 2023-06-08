@@ -2,4 +2,4 @@
 kiosk-wm
 src
 pkg
-
+*.pkg.tar.zst
