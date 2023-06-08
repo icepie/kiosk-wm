@@ -1,2 +1,5 @@
 *.o
 kiosk-wm
+src
+pkg
+
