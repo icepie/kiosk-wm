@@ -1,6 +1,6 @@
 CC = gcc
 CFLAGS = -Wall -Wextra
-LDFLAGS = -lX11 -lXext -lXfixes
+LDFLAGS = -lX11 -lXext -lXfixes -lXrandr
 
 kiosk-wm: kiosk-wm.o
 	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS)
