@@ -4,13 +4,16 @@
 #include <X11/extensions/dpms.h>
 #include <X11/extensions/Xfixes.h>
 #include <X11/extensions/Xrandr.h>
-
+#include <stdio.h>
 
 int main()
 {
     Display *display = XOpenDisplay(0x0);
     if (!display)
+    {
+        fprintf(stderr, "Unable to open X Display\n");
         return 1;
+    }
 
     Window root = DefaultRootWindow(display);
 
@@ -27,31 +30,60 @@ int main()
     // This allows us to receive CreateNotify and ConfigureNotify events.
     XSelectInput(display, root, SubstructureNotifyMask);
 
-    XFixesHideCursor(display, root);
-    XSync(display, True);
-
     // Get screen size
     int screen = DefaultScreen(display);
     int screen_width = DisplayWidth(display, screen);
     int screen_height = DisplayHeight(display, screen);
 
-    // Set window attributes for fullscreen
-    XEvent xev;
-    Atom wm_state = XInternAtom(display, "_NET_WM_STATE", False);
-    Atom fullscreen = XInternAtom(display, "_NET_WM_STATE_FULLSCREEN", False);
-    
-    xev.xclient.type = ClientMessage;
-    xev.xclient.serial = 0;
-    xev.xclient.send_event = True;
-    xev.xclient.window = root;
-    xev.xclient.message_type = wm_state;
-    xev.xclient.format = 32;
-    xev.xclient.data.l[0] = 1; // _NET_WM_STATE_ADD
-    xev.xclient.data.l[1] = fullscreen;
-    xev.xclient.data.l[2] = 0;
+    // Find the window with WM_CLASS "smart-doc-vault" and make it fullscreen
+    Window target_window = None;
+    Window parent, *children;
+    unsigned int num_children;
+    if (XQueryTree(display, root, &root, &parent, &children, &num_children))
+    {
+        for (unsigned int i = 0; i < num_children; i++)
+        {
+            XClassHint class_hint;
+            if (XGetClassHint(display, children[i], &class_hint))
+            {
+                if (class_hint.res_class && strcmp(class_hint.res_class, "smart-doc-vault") == 0)
+                {
+                    target_window = children[i];
+                    XFree(class_hint.res_class);
+                    XFree(class_hint.res_name);
+                    break;
+                }
+                XFree(class_hint.res_class);
+                XFree(class_hint.res_name);
+            }
+        }
+        XFree(children);
+    }
 
-    XSendEvent(display, root, False, SubstructureRedirectMask | SubstructureNotifyMask, &xev);
-    XFlush(display);
+    if (target_window != None)
+    {
+        // Set window attributes for fullscreen
+        XEvent xev;
+        Atom wm_state = XInternAtom(display, "_NET_WM_STATE", False);
+        Atom fullscreen = XInternAtom(display, "_NET_WM_STATE_FULLSCREEN", False);
+
+        xev.xclient.type = ClientMessage;
+        xev.xclient.serial = 0;
+        xev.xclient.send_event = True;
+        xev.xclient.window = target_window;
+        xev.xclient.message_type = wm_state;
+        xev.xclient.format = 32;
+        xev.xclient.data.l[0] = 1; // _NET_WM_STATE_ADD
+        xev.xclient.data.l[1] = fullscreen;
+        xev.xclient.data.l[2] = 0;
+
+        XSendEvent(display, target_window, False, SubstructureRedirectMask | SubstructureNotifyMask, &xev);
+        XFlush(display);
+    }
+    else
+    {
+        fprintf(stderr, "Window with WM_CLASS 'smart-doc-vault' not found\n");
+    }
 
     // Initialize RandR extension
     int rr_event_base, rr_error_base;
@@ -88,19 +120,16 @@ int main()
                     XMoveResizeWindow(display, ce.window, 0, 0, screen_width, screen_height);
                 }
             }
-            
-            XFixesHideCursor(display, root);
+
             XSync(display, True);
         }
         else if (ev.type == rr_event_base + RRScreenChangeNotify)
         {
-            XRRScreenChangeNotifyEvent *scr_ev = (XRRScreenChangeNotifyEvent*)&ev;
+            XRRScreenChangeNotifyEvent *scr_ev = (XRRScreenChangeNotifyEvent *)&ev;
             screen_width = scr_ev->width;
             screen_height = scr_ev->height;
         }
 
-        // XForceScreenSaver(display, ScreenSaverReset);
-        
         XSync(display, False);
     }
 
